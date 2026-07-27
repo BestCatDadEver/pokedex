@@ -22,7 +22,7 @@ fun PokemonDto.toDomain(): PokemonDetails {
     return PokemonDetails(
         name = name.replaceFirstChar { it.uppercase() },
         imageUrl = sprites.frontDefault,
-        height = height,
-        weight = weight
+        height = height.toInt(),
+        weight = weight.toInt()
     )
 }

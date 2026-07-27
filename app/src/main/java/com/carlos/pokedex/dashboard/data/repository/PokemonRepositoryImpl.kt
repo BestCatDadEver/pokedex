@@ -6,6 +6,7 @@ import com.carlos.pokedex.core.network.Resource
 import com.carlos.pokedex.core.network.Resource.Success
 import com.carlos.pokedex.core.network.toDomain
 import com.carlos.pokedex.dashboard.domain.model.Pokemon
+import com.carlos.pokedex.dashboard.domain.model.PokemonDetails
 import com.carlos.pokedex.dashboard.domain.repository.IPokemonRepository
 
 private const val TAG = "PokemonRepository"
@@ -30,12 +31,18 @@ class PokemonRepositoryImpl(private val apiService: PokedexService) : IPokemonRe
         }
     }
 
-    override suspend fun getByName(name: String): Resource<Pokemon> {
+    override suspend fun getByName(name: String): Resource<PokemonDetails> {
         return apiService.getByName(name).let { response ->
-            if(response.isSuccessful) {
+            Log.d(TAG, "getByName($name) -> code=${response.code()}, successful=${response.isSuccessful}")
+            if (response.isSuccessful) {
                 val result = response.body()
-                Success(data = result?.toDomain() ?: Pokemon(id = "", name = ""))
+                if (result == null) {
+                    Resource.Error("Empty response body")
+                } else {
+                    Success(result.toDomain())
+                }
             } else {
+                Log.e(TAG, "getByName($name) error=${response.errorBody()?.string()}")
                 Resource.Error(response.message())
             }
         }
