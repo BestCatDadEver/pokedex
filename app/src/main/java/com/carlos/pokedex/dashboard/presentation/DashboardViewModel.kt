@@ -39,8 +39,24 @@ class DashboardViewModel(
         when (action) {
             DashboardAction.Reload -> loadData(reset = true)
             DashboardAction.LoadMore -> loadData(reset = false)
-            is DashboardAction.ItemClicked -> {}
+            is DashboardAction.ItemClicked -> selectItem(action.item)
+            DashboardAction.NextPokemon -> moveSelection(1)
+            DashboardAction.PreviousPokemon -> moveSelection(-1)
         }
+    }
+
+    private fun selectItem(item: Pokemon) {
+        val index = _state.value.itemList.indexOfFirst { it.id == item.id }
+        if (index >= 0) {
+            _state.value = _state.value.copy(selectedIndex = index)
+        }
+    }
+
+    private fun moveSelection(delta: Int) {
+        val list = _state.value.itemList
+        if (list.isEmpty()) return
+        val newIndex = (_state.value.selectedIndex + delta).coerceIn(0, list.lastIndex)
+        _state.value = _state.value.copy(selectedIndex = newIndex)
     }
 
     private fun loadData(reset: Boolean) {
@@ -88,6 +104,7 @@ class DashboardViewModel(
                     isLoading = false,
                     isLoadingMore = false,
                     itemList = if (reset) detailedItems else _state.value.itemList + detailedItems,
+                    selectedIndex = if (reset) 0 else _state.value.selectedIndex,
                     endReached = detailedItems.size < PAGE_SIZE,
                     error = null
                 )
@@ -109,12 +126,17 @@ data class DashboardState(
     val itemList: List<Pokemon> = emptyList(),
     val error: String? = null,
     val endReached: Boolean = false,
-    val isLoadingMore: Boolean = false
-)
+    val isLoadingMore: Boolean = false,
+    val selectedIndex: Int = 0
+) {
+    val selectedPokemon: Pokemon? get() = itemList.getOrNull(selectedIndex)
+}
 
 sealed class DashboardAction {
     object Reload : DashboardAction()
     object LoadMore : DashboardAction()
+    object NextPokemon : DashboardAction()
+    object PreviousPokemon : DashboardAction()
     data class ItemClicked(val item: Pokemon) : DashboardAction()
 }
 
