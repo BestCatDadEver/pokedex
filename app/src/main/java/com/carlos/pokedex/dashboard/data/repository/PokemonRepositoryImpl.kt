@@ -11,8 +11,8 @@ import com.carlos.pokedex.dashboard.domain.repository.IPokemonRepository
 private const val TAG = "PokemonRepository"
 
 class PokemonRepositoryImpl(private val apiService: PokedexService) : IPokemonRepository {
-    override suspend fun getAll(): Resource<List<Pokemon>> {
-        return apiService.getAll().let { response ->
+    override suspend fun getAll(limit: Int, offset: Int): Resource<List<Pokemon>> {
+        return apiService.getAll(limit, offset).let { response ->
             Log.d(TAG, "getAll() -> code=${response.code()}, successful=${response.isSuccessful}")
             if (response.isSuccessful) {
                 val results = response.body()?.results
@@ -27,6 +27,17 @@ class PokemonRepositoryImpl(private val apiService: PokedexService) : IPokemonRe
                 Resource.Error(response.message())
             }
 
+        }
+    }
+
+    override suspend fun getByName(name: String): Resource<Pokemon> {
+        return apiService.getByName(name).let { response ->
+            if(response.isSuccessful) {
+                val result = response.body()
+                Success(data = result?.toDomain() ?: Pokemon(id = "", name = ""))
+            } else {
+                Resource.Error(response.message())
+            }
         }
     }
 

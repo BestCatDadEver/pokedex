@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -15,8 +16,10 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -27,7 +30,7 @@ import org.koin.androidx.compose.koinViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DashboardScreen(viewModel: DashboardViewModel = koinViewModel())  {
+fun DashboardScreen(viewModel: DashboardViewModel = koinViewModel()) {
     val state by viewModel.state.collectAsState()
 
     Scaffold(
@@ -40,6 +43,7 @@ fun DashboardScreen(viewModel: DashboardViewModel = koinViewModel())  {
                 state.isLoading -> {
                     CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
                 }
+
                 state.error != null -> {
                     Text(
                         text = state.error ?: "",
@@ -47,6 +51,7 @@ fun DashboardScreen(viewModel: DashboardViewModel = koinViewModel())  {
                         modifier = Modifier.align(Alignment.Center)
                     )
                 }
+
                 else -> {
                     DashboardScreenContent(state = state, onAction = viewModel::onAction)
                 }
@@ -60,10 +65,35 @@ fun DashboardScreenContent(
     state: DashboardState,
     onAction: (DashboardAction) -> Unit
 ) {
-    LazyColumn(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+    val listState = rememberLazyListState()
+
+    LaunchedEffect(listState, state.itemList.size) {
+        snapshotFlow { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index }
+            .collect { lastVisibleIndex ->
+                if (lastVisibleIndex != null && lastVisibleIndex >= state.itemList.size - 5) {
+                    onAction(DashboardAction.LoadMore)
+                }
+
+            }
+    }
+
+    LazyColumn(
+        state = listState,
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp)
+    ) {
         items(state.itemList.size) {
             DashboardItem(item = state.itemList[it]) {
                 onAction(DashboardAction.ItemClicked(state.itemList[it]))
+            }
+        }
+
+        if (state.isLoadingMore) {
+            item {
+                Box(modifier = Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
             }
         }
     }
