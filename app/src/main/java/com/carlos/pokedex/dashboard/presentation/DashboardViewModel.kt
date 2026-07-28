@@ -7,6 +7,9 @@ import com.carlos.pokedex.core.network.Resource
 import com.carlos.pokedex.dashboard.domain.model.Pokemon
 import com.carlos.pokedex.dashboard.domain.usecase.GetAllPokemonUseCase
 import com.carlos.pokedex.dashboard.domain.usecase.GetPokemonByNameUseCase
+import com.carlos.pokedex.favorites.domain.usecase.AddFavoriteUseCase
+import com.carlos.pokedex.favorites.domain.usecase.IsFavoriteUseCase
+import com.carlos.pokedex.favorites.domain.usecase.RemoveFavoriteUseCase
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -23,12 +26,16 @@ private const val MAX_CONCURRENT_DETAIL_REQUESTS = 10
 
 class DashboardViewModel(
     private val getAllPokemonUseCase: GetAllPokemonUseCase,
-    private val getPokemonByNameUseCase: GetPokemonByNameUseCase
+    private val getPokemonByNameUseCase: GetPokemonByNameUseCase,
+    private val isFavoriteUseCase: IsFavoriteUseCase,
+    private val addFavoriteUseCase: AddFavoriteUseCase,
+    private val removeFavoriteUseCase: RemoveFavoriteUseCase
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(DashboardState())
     val state: StateFlow<DashboardState> = _state
     private var job: Job? = null
+    private var favoriteObservationJob: Job? = null
     private var offset = 0
 
     init {
@@ -42,13 +49,14 @@ class DashboardViewModel(
             is DashboardAction.ItemClicked -> selectItem(action.item)
             DashboardAction.NextPokemon -> moveSelection(1)
             DashboardAction.PreviousPokemon -> moveSelection(-1)
+            DashboardAction.ToggleFavorite -> toggleFavorite()
         }
     }
 
     private fun selectItem(item: Pokemon) {
         val index = _state.value.itemList.indexOfFirst { it.id == item.id }
         if (index >= 0) {
-            _state.value = _state.value.copy(selectedIndex = index)
+            updateSelectedIndex(index)
         }
     }
 
@@ -56,7 +64,36 @@ class DashboardViewModel(
         val list = _state.value.itemList
         if (list.isEmpty()) return
         val newIndex = (_state.value.selectedIndex + delta).coerceIn(0, list.lastIndex)
-        _state.value = _state.value.copy(selectedIndex = newIndex)
+        updateSelectedIndex(newIndex)
+    }
+
+    private fun updateSelectedIndex(index: Int) {
+        _state.value = _state.value.copy(selectedIndex = index)
+        observeFavoriteStatus(_state.value.selectedPokemon?.id)
+    }
+
+    private fun observeFavoriteStatus(pokemonId: String?) {
+        favoriteObservationJob?.cancel()
+        if (pokemonId == null) {
+            _state.value = _state.value.copy(isSelectedFavorite = false)
+            return
+        }
+        favoriteObservationJob = viewModelScope.launch {
+            isFavoriteUseCase(pokemonId).collect { isFavorite ->
+                _state.value = _state.value.copy(isSelectedFavorite = isFavorite)
+            }
+        }
+    }
+
+    private fun toggleFavorite() {
+        val pokemon = _state.value.selectedPokemon ?: return
+        viewModelScope.launch {
+            if (_state.value.isSelectedFavorite) {
+                removeFavoriteUseCase(pokemon.id)
+            } else {
+                addFavoriteUseCase(pokemon)
+            }
+        }
     }
 
     private fun loadData(reset: Boolean) {
@@ -108,6 +145,9 @@ class DashboardViewModel(
                     endReached = detailedItems.size < PAGE_SIZE,
                     error = null
                 )
+                if (reset) {
+                    observeFavoriteStatus(_state.value.selectedPokemon?.id)
+                }
             }.onFailure { e ->
                 Log.e(TAG, "loadData() failed", e)
                 _state.value = _state.value.copy(
@@ -127,7 +167,8 @@ data class DashboardState(
     val error: String? = null,
     val endReached: Boolean = false,
     val isLoadingMore: Boolean = false,
-    val selectedIndex: Int = 0
+    val selectedIndex: Int = 0,
+    val isSelectedFavorite: Boolean = false
 ) {
     val selectedPokemon: Pokemon? get() = itemList.getOrNull(selectedIndex)
 }
@@ -137,6 +178,6 @@ sealed class DashboardAction {
     object LoadMore : DashboardAction()
     object NextPokemon : DashboardAction()
     object PreviousPokemon : DashboardAction()
+    object ToggleFavorite : DashboardAction()
     data class ItemClicked(val item: Pokemon) : DashboardAction()
 }
-

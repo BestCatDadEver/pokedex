@@ -4,8 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import com.carlos.pokedex.dashboard.presentation.DashboardScreen
-import com.carlos.pokedex.dashboard.presentation.DashboardViewModel
+import com.carlos.pokedex.core.navigation.PokedexApp
 import com.carlos.pokedex.ui.theme.PokedexTheme
 
 class MainActivity : ComponentActivity() {
@@ -14,7 +13,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             PokedexTheme {
-                DashboardScreen()
+                PokedexApp()
             }
         }
     }

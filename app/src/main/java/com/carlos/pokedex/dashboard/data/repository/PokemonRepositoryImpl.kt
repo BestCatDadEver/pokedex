@@ -6,6 +6,7 @@ import com.carlos.pokedex.core.network.Resource
 import com.carlos.pokedex.core.network.Resource.Success
 import com.carlos.pokedex.core.network.toDomain
 import com.carlos.pokedex.dashboard.data.local.pokemon.PokemonDao
+import com.carlos.pokedex.dashboard.data.local.pokemon.PokemonEntity
 import com.carlos.pokedex.dashboard.data.local.pokemon.toDomain
 import com.carlos.pokedex.dashboard.data.local.pokemon.toEntity
 import com.carlos.pokedex.dashboard.domain.model.Pokemon
@@ -20,6 +21,12 @@ class PokemonRepositoryImpl(
 ) : IPokemonRepository {
 
     override suspend fun getAll(limit: Int, offset: Int): Resource<List<Pokemon>> {
+        val cachedPage = pokemonDao.getPage(limit, offset)
+        if (cachedPage.size == limit) {
+            Log.d(TAG, "getAll() offset=$offset served from cache")
+            return Success(cachedPage.toDomainWithDetails())
+        }
+
         return try {
             apiService.getAll(limit, offset).let { response ->
                 Log.d(TAG, "getAll() -> code=${response.code()}, successful=${response.isSuccessful}")
@@ -48,13 +55,21 @@ class PokemonRepositoryImpl(
         val cached = pokemonDao.getPage(limit, offset)
         Log.d(TAG, "getCachedPage() offset=$offset cachedCount=${cached.size}")
         return if (cached.isNotEmpty()) {
-            Success(cached.map { entity -> entity.toDomain(pokemonDao.getDetailsByName(entity.name)?.toDomain()) })
+            Success(cached.toDomainWithDetails())
         } else {
             Resource.Error(errorMessage)
         }
     }
 
+    private suspend fun List<PokemonEntity>.toDomainWithDetails(): List<Pokemon> =
+        map { entity -> entity.toDomain(pokemonDao.getDetailsByName(entity.name)?.toDomain()) }
+
     override suspend fun getByName(name: String): Resource<PokemonDetails> {
+        pokemonDao.getDetailsByName(name)?.let { cached ->
+            Log.d(TAG, "getByName($name) served from cache")
+            return Success(cached.toDomain())
+        }
+
         return try {
             apiService.getByName(name).let { response ->
                 Log.d(TAG, "getByName($name) -> code=${response.code()}, successful=${response.isSuccessful}")
