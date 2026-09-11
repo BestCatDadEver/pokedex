@@ -33,6 +33,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import com.carlos.pokedex.core.ui.formatHeightOrDash
+import com.carlos.pokedex.core.ui.formatWeightOrDash
 import com.carlos.pokedex.dashboard.domain.model.Pokemon
 import org.koin.androidx.compose.koinViewModel
 
@@ -135,7 +137,8 @@ fun FavoriteItem(
                 Column(modifier = Modifier.padding(start = 12.dp)) {
                     Text(text = pokemon.name, style = MaterialTheme.typography.titleMedium)
                     Text(
-                        text = "Altura: ${pokemon.details?.height ?: "-"}  Peso: ${pokemon.details?.weight ?: "-"}",
+                        text = "Altura: ${formatHeightOrDash(pokemon.details?.height)}  " +
+                            "Peso: ${formatWeightOrDash(pokemon.details?.weight)}",
                         style = MaterialTheme.typography.bodySmall
                     )
                 }

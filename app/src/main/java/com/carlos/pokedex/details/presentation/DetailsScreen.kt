@@ -44,6 +44,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
+import com.carlos.pokedex.core.ui.formatHeight
+import com.carlos.pokedex.core.ui.formatWeight
+import com.carlos.pokedex.core.ui.toTitleCase
 import com.carlos.pokedex.dashboard.domain.model.PokemonDetails
 import com.carlos.pokedex.dashboard.domain.model.PokemonStat
 import org.koin.androidx.compose.koinViewModel
@@ -201,8 +204,8 @@ fun DetailsContent(
                     .padding(16.dp),
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
-                MeasurementColumn(label = "Altura", value = formatDecimetres(details.height))
-                MeasurementColumn(label = "Peso", value = formatHectograms(details.weight))
+                MeasurementColumn(label = "Altura", value = formatHeight(details.height))
+                MeasurementColumn(label = "Peso", value = formatWeight(details.weight))
             }
         }
 

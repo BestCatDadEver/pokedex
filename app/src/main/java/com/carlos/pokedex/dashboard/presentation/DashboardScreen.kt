@@ -33,8 +33,6 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -63,6 +61,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.carlos.pokedex.R
+import com.carlos.pokedex.core.ui.formatHeightOrDash
+import com.carlos.pokedex.core.ui.formatWeightOrDash
 import com.carlos.pokedex.dashboard.domain.model.Pokemon
 import org.koin.androidx.compose.koinViewModel
 
@@ -175,12 +175,9 @@ fun DashboardScreenContent(
                     item = pokemon,
                     isSelected = isSelected
                 ) {
-                    // El primer tap selecciona; tocar la tarjeta ya seleccionada abre el detalle.
-                    if (isSelected) {
-                        onPokemonClick(pokemon.name)
-                    } else {
-                        onAction(DashboardAction.ItemClicked(pokemon))
-                    }
+                    // Selecciona y abre el detalle, así al volver la tarjeta queda seleccionada.
+                    onAction(DashboardAction.ItemClicked(pokemon))
+                    onPokemonClick(pokemon.name)
                 }
             }
 
@@ -291,7 +288,9 @@ fun SelectedPokemonSection(
         }
 
         Card(
-            modifier = Modifier.weight(1f),
+            modifier = Modifier
+                .weight(1f)
+                .clickable(enabled = pokemon != null) { pokemon?.let { onDetails(it.name) } },
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.55f)),
             elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
             border = BorderStroke(1.dp, Color.Black)
@@ -326,36 +325,19 @@ fun SelectedPokemonSection(
                             )
                             Spacer(modifier = Modifier.height(12.dp))
                             Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-                                Text(text = "Altura: ${targetPokemon.details?.height ?: "-"}")
-                                Text(text = "Peso: ${targetPokemon.details?.weight ?: "-"}")
+                                Text(text = "Altura: ${formatHeightOrDash(targetPokemon.details?.height)}")
+                                Text(text = "Peso: ${formatWeightOrDash(targetPokemon.details?.weight)}")
                             }
                         }
                     }
                 }
                 Spacer(modifier = Modifier.height(4.dp))
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    IconButton(onClick = onToggleFavorite, enabled = pokemon != null) {
-                        Icon(
-                            imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                            contentDescription = if (isFavorite) "Quitar de favoritos" else "Agregar a favoritos",
-                            tint = if (isFavorite) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    Button(
-                        onClick = { pokemon?.let { onDetails(it.name) } },
-                        enabled = pokemon != null,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color.Black,
-                            contentColor = Color.White,
-                            disabledContainerColor = Color.Black.copy(alpha = 0.4f),
-                            disabledContentColor = Color.White.copy(alpha = 0.6f)
-                        )
-                    ) {
-                        Text(text = "Ver detalles")
-                    }
+                IconButton(onClick = onToggleFavorite, enabled = pokemon != null) {
+                    Icon(
+                        imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                        contentDescription = if (isFavorite) "Quitar de favoritos" else "Agregar a favoritos",
+                        tint = if (isFavorite) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
         }

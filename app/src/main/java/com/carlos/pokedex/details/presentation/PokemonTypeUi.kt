@@ -1,6 +1,7 @@
 package com.carlos.pokedex.details.presentation
 
 import androidx.compose.ui.graphics.Color
+import com.carlos.pokedex.core.ui.toTitleCase
 
 private val typeColors = mapOf(
     "normal" to Color(0xFFA8A77A),
@@ -58,13 +59,3 @@ fun typeColor(type: String): Color = typeColors[type.lowercase()] ?: Color(0xFF9
 fun typeLabel(type: String): String = typeLabels[type.lowercase()] ?: type.toTitleCase()
 
 fun statLabel(stat: String): String = statLabels[stat.lowercase()] ?: stat.toTitleCase()
-
-/** Turns API slugs such as "solar-power" into "Solar Power". */
-fun String.toTitleCase(): String = split("-")
-    .filter { it.isNotEmpty() }
-    .joinToString(" ") { word -> word.replaceFirstChar { it.uppercase() } }
-
-/** The API reports height in decimetres and weight in hectograms. */
-fun formatDecimetres(value: Int): String = "${value / 10}.${value % 10} m"
-
-fun formatHectograms(value: Int): String = "${value / 10}.${value % 10} kg"
