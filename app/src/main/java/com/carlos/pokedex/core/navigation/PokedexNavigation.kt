@@ -1,5 +1,6 @@
 package com.carlos.pokedex.core.navigation
 
+import android.net.Uri
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -21,17 +22,25 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.carlos.pokedex.R
 import com.carlos.pokedex.dashboard.presentation.DashboardScreen
+import com.carlos.pokedex.details.presentation.DetailsScreen
 import com.carlos.pokedex.favorites.presentation.FavoritesScreen
+
+const val DETAILS_NAME_ARG = "name"
 
 sealed class PokedexDestination(val route: String, val label: String) {
     object Dashboard : PokedexDestination("dashboard", "Dashboard")
     object Favorites : PokedexDestination("favorites", "Favoritos")
+    object Details : PokedexDestination("details/{$DETAILS_NAME_ARG}", "Detalles") {
+        fun createRoute(name: String) = "details/${Uri.encode(name)}"
+    }
 }
 
 private val bottomBarDestinations = listOf(PokedexDestination.Dashboard, PokedexDestination.Favorites)
@@ -41,6 +50,13 @@ private val bottomBarDestinations = listOf(PokedexDestination.Dashboard, Pokedex
 fun PokedexApp(navController: NavHostController = rememberNavController()) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
+    val showBottomBar = bottomBarDestinations.any { it.route == currentRoute }
+
+    val openDetails: (String) -> Unit = { name ->
+        navController.navigate(PokedexDestination.Details.createRoute(name)) {
+            launchSingleTop = true
+        }
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Image(
@@ -53,29 +69,31 @@ fun PokedexApp(navController: NavHostController = rememberNavController()) {
         Scaffold(
             containerColor = Color.Transparent,
             bottomBar = {
-                NavigationBar(containerColor = Color.Transparent) {
-                    bottomBarDestinations.forEach { destination ->
-                        NavigationBarItem(
-                            selected = currentRoute == destination.route,
-                            onClick = {
-                                navController.navigate(destination.route) {
-                                    popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                                    launchSingleTop = true
-                                    restoreState = true
-                                }
-                            },
-                            icon = {
-                                Icon(
-                                    imageVector = if (destination == PokedexDestination.Dashboard) {
-                                        Icons.Default.Home
-                                    } else {
-                                        Icons.Default.Favorite
-                                    },
-                                    contentDescription = destination.label
-                                )
-                            },
-                            label = { Text(destination.label) }
-                        )
+                if (showBottomBar) {
+                    NavigationBar(containerColor = Color.Transparent) {
+                        bottomBarDestinations.forEach { destination ->
+                            NavigationBarItem(
+                                selected = currentRoute == destination.route,
+                                onClick = {
+                                    navController.navigate(destination.route) {
+                                        popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                                        launchSingleTop = true
+                                        restoreState = true
+                                    }
+                                },
+                                icon = {
+                                    Icon(
+                                        imageVector = if (destination == PokedexDestination.Dashboard) {
+                                            Icons.Default.Home
+                                        } else {
+                                            Icons.Default.Favorite
+                                        },
+                                        contentDescription = destination.label
+                                    )
+                                },
+                                label = { Text(destination.label) }
+                            )
+                        }
                     }
                 }
             }
@@ -85,8 +103,21 @@ fun PokedexApp(navController: NavHostController = rememberNavController()) {
                 startDestination = PokedexDestination.Dashboard.route,
                 modifier = Modifier.padding(paddingValues)
             ) {
-                composable(PokedexDestination.Dashboard.route) { DashboardScreen() }
-                composable(PokedexDestination.Favorites.route) { FavoritesScreen() }
+                composable(PokedexDestination.Dashboard.route) {
+                    DashboardScreen(onPokemonClick = openDetails)
+                }
+                composable(PokedexDestination.Favorites.route) {
+                    FavoritesScreen(onPokemonClick = openDetails)
+                }
+                composable(
+                    route = PokedexDestination.Details.route,
+                    arguments = listOf(navArgument(DETAILS_NAME_ARG) { type = NavType.StringType })
+                ) { backStackEntry ->
+                    DetailsScreen(
+                        pokemonName = backStackEntry.arguments?.getString(DETAILS_NAME_ARG).orEmpty(),
+                        onBack = { navController.popBackStack() }
+                    )
+                }
             }
         }
     }

@@ -33,6 +33,8 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -57,17 +59,19 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.carlos.pokedex.R
 import com.carlos.pokedex.dashboard.domain.model.Pokemon
-import com.carlos.pokedex.dashboard.domain.model.PokemonDetails
 import org.koin.androidx.compose.koinViewModel
 
 @Composable
-fun DashboardScreen(viewModel: DashboardViewModel = koinViewModel()) {
-    val state by viewModel.state.collectAsState()
+fun DashboardScreen(
+    onPokemonClick: (String) -> Unit,
+    viewModel: DashboardViewModel = koinViewModel()
+) {
+    val state by viewModel.state.collectAsStateWithLifecycle()
 
     Scaffold(
         containerColor = Color.Transparent,
@@ -88,7 +92,11 @@ fun DashboardScreen(viewModel: DashboardViewModel = koinViewModel()) {
                 }
 
                 else -> {
-                    DashboardScreenContent(state = state, onAction = viewModel::onAction)
+                    DashboardScreenContent(
+                        state = state,
+                        onAction = viewModel::onAction,
+                        onPokemonClick = onPokemonClick
+                    )
                 }
             }
         }
@@ -98,7 +106,8 @@ fun DashboardScreen(viewModel: DashboardViewModel = koinViewModel()) {
 @Composable
 fun DashboardScreenContent(
     state: DashboardState,
-    onAction: (DashboardAction) -> Unit
+    onAction: (DashboardAction) -> Unit,
+    onPokemonClick: (String) -> Unit
 ) {
     val listState = rememberLazyListState()
 
@@ -111,6 +120,8 @@ fun DashboardScreenContent(
 
             }
     }
+
+    
 
     LaunchedEffect(state.selectedIndex) {
         val targetIndex = state.selectedIndex
@@ -157,18 +168,27 @@ fun DashboardScreenContent(
                 .padding(16.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            items(state.itemList.size) {
+            items(state.itemList.size) { index ->
+                val pokemon = state.itemList[index]
+                val isSelected = index == state.selectedIndex
                 DashboardItem(
-                    item = state.itemList[it],
-                    isSelected = it == state.selectedIndex
+                    item = pokemon,
+                    isSelected = isSelected
                 ) {
-                    onAction(DashboardAction.ItemClicked(state.itemList[it]))
+                    // El primer tap selecciona; tocar la tarjeta ya seleccionada abre el detalle.
+                    if (isSelected) {
+                        onPokemonClick(pokemon.name)
+                    } else {
+                        onAction(DashboardAction.ItemClicked(pokemon))
+                    }
                 }
             }
 
             if (state.isLoadingMore) {
                 item {
-                    Box(modifier = Modifier.fillMaxHeight().padding(16.dp), contentAlignment = Alignment.Center) {
+                    Box(modifier = Modifier
+                        .fillMaxHeight()
+                        .padding(16.dp), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator()
                     }
                 }
@@ -184,6 +204,7 @@ fun DashboardScreenContent(
             onPrevious = { onAction(DashboardAction.PreviousPokemon) },
             onNext = { onAction(DashboardAction.NextPokemon) },
             onToggleFavorite = { onAction(DashboardAction.ToggleFavorite) },
+            onDetails = onPokemonClick,
             modifier = Modifier.fillMaxWidth()
         )
     }
@@ -226,10 +247,6 @@ fun DashboardItem(
                 contentDescription = item.name,
                 modifier = Modifier.size(80.dp)
             )
-            Text(
-                text = item.name,
-                style = MaterialTheme.typography.titleMedium
-            )
         }
     }
 }
@@ -244,6 +261,7 @@ fun SelectedPokemonSection(
     onPrevious: () -> Unit,
     onNext: () -> Unit,
     onToggleFavorite: () -> Unit,
+    onDetails: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var previousIndex by remember { mutableIntStateOf(selectedIndex) }
@@ -315,12 +333,29 @@ fun SelectedPokemonSection(
                     }
                 }
                 Spacer(modifier = Modifier.height(4.dp))
-                IconButton(onClick = onToggleFavorite, enabled = pokemon != null) {
-                    Icon(
-                        imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                        contentDescription = if (isFavorite) "Quitar de favoritos" else "Agregar a favoritos",
-                        tint = if (isFavorite) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    IconButton(onClick = onToggleFavorite, enabled = pokemon != null) {
+                        Icon(
+                            imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                            contentDescription = if (isFavorite) "Quitar de favoritos" else "Agregar a favoritos",
+                            tint = if (isFavorite) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Button(
+                        onClick = { pokemon?.let { onDetails(it.name) } },
+                        enabled = pokemon != null,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color.Black,
+                            contentColor = Color.White,
+                            disabledContainerColor = Color.Black.copy(alpha = 0.4f),
+                            disabledContentColor = Color.White.copy(alpha = 0.6f)
+                        )
+                    ) {
+                        Text(text = "Ver detalles")
+                    }
                 }
             }
         }
@@ -343,17 +378,4 @@ fun SelectedPokemonSection(
     }
 }
 
-@Preview(showBackground = true)
-@Composable
-fun DashboardScreenPreview() {
-    DashboardScreenContent(
-        state = DashboardState(
-            itemList = listOf(
-                Pokemon("1", "Pikachu", PokemonDetails("Pikachu", "", 4, 60)),
-                Pokemon("2", "Bulbasaur", PokemonDetails("Bulbasaur", "", 7, 69)),
-                Pokemon("3", "Hitmonchan", PokemonDetails("Hitmonchan", "", 14, 502))
-            )
-        ),
-        onAction = {}
-    )
-}
+

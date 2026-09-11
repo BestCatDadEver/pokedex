@@ -17,14 +17,28 @@ fun PokemonEntity.toDomain(details: PokemonDetails? = null): Pokemon = Pokemon(
 
 fun PokemonDetails.toEntity(): PokemonDetailsEntity = PokemonDetailsEntity(
     name = name,
+    id = id,
     imageUrl = imageUrl,
     height = height,
-    weight = weight
+    weight = weight,
+    types = types,
+    abilities = abilities,
+    stats = stats,
+    backImageUrl = backImageUrl,
+    shinyImageUrl = shinyImageUrl,
+    backShinyImageUrl = backShinyImageUrl
 )
 
 fun PokemonDetailsEntity.toDomain(): PokemonDetails = PokemonDetails(
+    id = id,
     name = name,
     imageUrl = imageUrl,
     height = height,
-    weight = weight
+    weight = weight,
+    types = types,
+    abilities = abilities,
+    stats = stats,
+    backImageUrl = backImageUrl,
+    shinyImageUrl = shinyImageUrl,
+    backShinyImageUrl = backShinyImageUrl
 )

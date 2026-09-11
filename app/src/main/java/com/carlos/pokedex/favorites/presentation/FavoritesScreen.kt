@@ -1,5 +1,6 @@
 package com.carlos.pokedex.favorites.presentation
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -37,7 +38,10 @@ import org.koin.androidx.compose.koinViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun FavoritesScreen(viewModel: FavoritesViewModel = koinViewModel()) {
+fun FavoritesScreen(
+    onPokemonClick: (String) -> Unit,
+    viewModel: FavoritesViewModel = koinViewModel()
+) {
     val state by viewModel.state.collectAsState()
 
     Scaffold(
@@ -74,7 +78,8 @@ fun FavoritesScreen(viewModel: FavoritesViewModel = koinViewModel()) {
                 else -> {
                     FavoritesList(
                         items = state.items,
-                        onRemove = { id -> viewModel.onAction(FavoritesAction.RemoveFavorite(id)) }
+                        onRemove = { id -> viewModel.onAction(FavoritesAction.RemoveFavorite(id)) },
+                        onPokemonClick = onPokemonClick
                     )
                 }
             }
@@ -85,7 +90,8 @@ fun FavoritesScreen(viewModel: FavoritesViewModel = koinViewModel()) {
 @Composable
 fun FavoritesList(
     items: List<Pokemon>,
-    onRemove: (String) -> Unit
+    onRemove: (String) -> Unit,
+    onPokemonClick: (String) -> Unit
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -93,7 +99,11 @@ fun FavoritesList(
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         items(items, key = { it.id }) { pokemon ->
-            FavoriteItem(pokemon = pokemon, onRemove = { onRemove(pokemon.id) })
+            FavoriteItem(
+                pokemon = pokemon,
+                onRemove = { onRemove(pokemon.id) },
+                onClick = { onPokemonClick(pokemon.name) }
+            )
         }
     }
 }
@@ -101,9 +111,14 @@ fun FavoritesList(
 @Composable
 fun FavoriteItem(
     pokemon: Pokemon,
-    onRemove: () -> Unit
+    onRemove: () -> Unit,
+    onClick: () -> Unit
 ) {
-    Card(modifier = Modifier.fillMaxWidth()) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() }
+    ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()

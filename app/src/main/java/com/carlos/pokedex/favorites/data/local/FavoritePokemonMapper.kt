@@ -16,7 +16,7 @@ fun FavoritePokemonEntity.toDomain(): Pokemon = Pokemon(
     id = id,
     name = name,
     details = if (imageUrl != null && height != null && weight != null) {
-        PokemonDetails(name = name, imageUrl = imageUrl, height = height, weight = weight)
+        PokemonDetails(id = id, name = name, imageUrl = imageUrl, height = height, weight = weight)
     } else {
         null
     }

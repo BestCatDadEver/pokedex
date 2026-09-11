@@ -10,6 +10,7 @@ import com.carlos.pokedex.dashboard.domain.repository.IPokemonRepository
 import com.carlos.pokedex.dashboard.domain.usecase.GetAllPokemonUseCase
 import com.carlos.pokedex.dashboard.domain.usecase.GetPokemonByNameUseCase
 import com.carlos.pokedex.dashboard.presentation.DashboardViewModel
+import com.carlos.pokedex.details.presentation.DetailsViewModel
 import com.carlos.pokedex.favorites.data.repository.FavoritePokemonRepositoryImpl
 import com.carlos.pokedex.favorites.domain.repository.IFavoritePokemonRepository
 import com.carlos.pokedex.favorites.domain.usecase.AddFavoriteUseCase
@@ -39,4 +40,5 @@ val appModule = module {
     single { RemoveFavoriteUseCase(get()) }
     viewModel { DashboardViewModel(get(), get(), get(), get(), get()) }
     viewModel { FavoritesViewModel(get(), get()) }
+    viewModel { (name: String) -> DetailsViewModel(name, get(), get(), get(), get()) }
 }
