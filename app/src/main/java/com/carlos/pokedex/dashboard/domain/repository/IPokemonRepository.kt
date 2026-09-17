@@ -8,4 +8,5 @@ interface IPokemonRepository {
 
     suspend fun getAll(limit: Int, offset: Int): Resource<List<Pokemon>>
     suspend fun getByName(name: String): Resource<PokemonDetails>
+    suspend fun search(query: String, limit: Int): Resource<List<Pokemon>>
 }

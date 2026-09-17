@@ -9,6 +9,7 @@ import com.carlos.pokedex.dashboard.data.repository.PokemonRepositoryImpl
 import com.carlos.pokedex.dashboard.domain.repository.IPokemonRepository
 import com.carlos.pokedex.dashboard.domain.usecase.GetAllPokemonUseCase
 import com.carlos.pokedex.dashboard.domain.usecase.GetPokemonByNameUseCase
+import com.carlos.pokedex.dashboard.domain.usecase.SearchPokemonUseCase
 import com.carlos.pokedex.dashboard.presentation.DashboardViewModel
 import com.carlos.pokedex.details.presentation.DetailsViewModel
 import com.carlos.pokedex.favorites.data.repository.FavoritePokemonRepositoryImpl
@@ -34,11 +35,12 @@ val appModule = module {
     single<IFavoritePokemonRepository> { FavoritePokemonRepositoryImpl(get()) }
     single { GetAllPokemonUseCase(get()) }
     single { GetPokemonByNameUseCase(get()) }
+    single { SearchPokemonUseCase(get()) }
     single { ObserveFavoritesUseCase(get()) }
     single { IsFavoriteUseCase(get()) }
     single { AddFavoriteUseCase(get()) }
     single { RemoveFavoriteUseCase(get()) }
-    viewModel { DashboardViewModel(get(), get(), get(), get(), get()) }
+    viewModel { DashboardViewModel(get(), get(), get(), get(), get(), get()) }
     viewModel { FavoritesViewModel(get(), get()) }
     viewModel { (name: String) -> DetailsViewModel(name, get(), get(), get(), get()) }
 }

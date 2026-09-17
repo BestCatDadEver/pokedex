@@ -14,6 +14,16 @@ interface PokemonDao {
     @Query("SELECT * FROM pokemon ORDER BY orderIndex ASC LIMIT :limit OFFSET :offset")
     suspend fun getPage(limit: Int, offset: Int): List<PokemonEntity>
 
+    @Query("SELECT COUNT(*) FROM pokemon")
+    suspend fun count(): Int
+
+    @Query(
+        "SELECT * FROM pokemon WHERE name LIKE '%' || :query || '%' " +
+            "ORDER BY CASE WHEN name LIKE :query || '%' THEN 0 ELSE 1 END, orderIndex ASC " +
+            "LIMIT :limit"
+    )
+    suspend fun searchByName(query: String, limit: Int): List<PokemonEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertDetails(details: PokemonDetailsEntity)
 

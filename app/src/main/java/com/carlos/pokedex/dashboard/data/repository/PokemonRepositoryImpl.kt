@@ -15,10 +15,18 @@ import com.carlos.pokedex.dashboard.domain.repository.IPokemonRepository
 
 private const val TAG = "PokemonRepository"
 
+/**
+ * La lista de nombres es barata (un solo request para toda la pokédex) y es lo que permite
+ * buscar por coincidencia parcial sin pegarle a la red en cada tecla.
+ */
+private const val NAME_INDEX_LIMIT = 100_000
+
 class PokemonRepositoryImpl(
     private val apiService: PokedexService,
     private val pokemonDao: PokemonDao
 ) : IPokemonRepository {
+
+    private var nameIndexSynced = false
 
     override suspend fun getAll(limit: Int, offset: Int): Resource<List<Pokemon>> {
         val cachedPage = pokemonDao.getPage(limit, offset)
@@ -90,6 +98,49 @@ class PokemonRepositoryImpl(
         } catch (e: Exception) {
             Log.e(TAG, "getByName($name) network failure", e)
             getCachedDetails(name, e.message ?: "Network error")
+        }
+    }
+
+    override suspend fun search(query: String, limit: Int): Resource<List<Pokemon>> {
+        ensureNameIndex()
+
+        // Los nombres de la pokéapi nunca traen comodines de SQL, así que descartarlos evita
+        // que un "%" escrito por el usuario se interprete como patrón.
+        val sanitized = query.trim().replace("%", "").replace("_", "")
+        if (sanitized.isEmpty()) return Success(emptyList())
+
+        return try {
+            val matches = pokemonDao.searchByName(sanitized, limit)
+            Log.d(TAG, "search($sanitized) matches=${matches.size}")
+            Success(matches.map { it.toDomain() })
+        } catch (e: Exception) {
+            Log.e(TAG, "search($sanitized) failed", e)
+            Resource.Error(e.message ?: "Search error")
+        }
+    }
+
+    /**
+     * Descarga el índice completo de nombres una vez por proceso. Si falla (sin conexión), la
+     * búsqueda sigue funcionando sobre lo que ya haya en caché.
+     */
+    private suspend fun ensureNameIndex() {
+        if (nameIndexSynced) return
+
+        runCatching {
+            val response = apiService.getAll(NAME_INDEX_LIMIT, 0)
+            if (!response.isSuccessful) {
+                Log.e(TAG, "ensureNameIndex() error code=${response.code()}")
+                return@runCatching
+            }
+            val results = response.body()?.results.orEmpty()
+            if (results.isEmpty()) return@runCatching
+
+            val pokemons = results.map { it.toDomain() }
+            pokemonDao.insertAll(pokemons.mapIndexed { index, pokemon -> pokemon.toEntity(index) })
+            nameIndexSynced = true
+            Log.d(TAG, "ensureNameIndex() cached ${pokemons.size} names")
+        }.onFailure { e ->
+            Log.e(TAG, "ensureNameIndex() network failure", e)
         }
     }
 

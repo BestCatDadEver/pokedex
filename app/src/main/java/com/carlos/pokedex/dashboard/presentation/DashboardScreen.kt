@@ -27,12 +27,15 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -41,6 +44,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -57,6 +62,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
@@ -111,10 +117,10 @@ fun DashboardScreenContent(
 ) {
     val listState = rememberLazyListState()
 
-    LaunchedEffect(listState, state.itemList.size) {
+    LaunchedEffect(listState, state.displayedList.size) {
         snapshotFlow { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index }
             .collect { lastVisibleIndex ->
-                if (lastVisibleIndex != null && lastVisibleIndex >= state.itemList.size - 5) {
+                if (lastVisibleIndex != null && lastVisibleIndex >= state.displayedList.size - 5) {
                     onAction(DashboardAction.LoadMore)
                 }
 
@@ -125,7 +131,7 @@ fun DashboardScreenContent(
 
     LaunchedEffect(state.selectedIndex) {
         val targetIndex = state.selectedIndex
-        if (targetIndex !in state.itemList.indices) return@LaunchedEffect
+        if (targetIndex !in state.displayedList.indices) return@LaunchedEffect
 
         val layoutInfo = listState.layoutInfo
         val visibleItem = layoutInfo.visibleItemsInfo.find { it.index == targetIndex }
@@ -160,33 +166,55 @@ fun DashboardScreenContent(
             contentScale = ContentScale.FillWidth
         )
 
-        LazyRow(
-            state = listState,
+        PokemonSearchField(
+            query = state.searchQuery,
+            isSearching = state.isSearching,
+            onQueryChange = { onAction(DashboardAction.SearchQueryChanged(it)) },
+            onClear = { onAction(DashboardAction.ClearSearch) },
             modifier = Modifier
                 .fillMaxWidth()
-                .height(166.dp)
-                .padding(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            items(state.itemList.size) { index ->
-                val pokemon = state.itemList[index]
-                val isSelected = index == state.selectedIndex
-                DashboardItem(
-                    item = pokemon,
-                    isSelected = isSelected
-                ) {
-                    // Selecciona y abre el detalle, así al volver la tarjeta queda seleccionada.
-                    onAction(DashboardAction.ItemClicked(pokemon))
-                    onPokemonClick(pokemon.name)
-                }
-            }
+                .padding(horizontal = 16.dp)
+        )
 
-            if (state.isLoadingMore) {
-                item {
-                    Box(modifier = Modifier
-                        .fillMaxHeight()
-                        .padding(16.dp), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator()
+        if (state.showEmptySearchMessage) {
+            Text(
+                text = "Ningún pokémon coincide con \"${state.searchQuery}\"",
+                style = MaterialTheme.typography.bodyMedium,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(166.dp)
+                    .padding(32.dp)
+            )
+        } else {
+            LazyRow(
+                state = listState,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(166.dp)
+                    .padding(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(state.displayedList.size) { index ->
+                    val pokemon = state.displayedList[index]
+                    val isSelected = index == state.selectedIndex
+                    DashboardItem(
+                        item = pokemon,
+                        isSelected = isSelected
+                    ) {
+                        // Selecciona y abre el detalle, así al volver la tarjeta queda seleccionada.
+                        onAction(DashboardAction.ItemClicked(pokemon))
+                        onPokemonClick(pokemon.name)
+                    }
+                }
+
+                if (state.isLoadingMore) {
+                    item {
+                        Box(modifier = Modifier
+                            .fillMaxHeight()
+                            .padding(16.dp), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator()
+                        }
                     }
                 }
             }
@@ -197,7 +225,7 @@ fun DashboardScreenContent(
             selectedIndex = state.selectedIndex,
             isFavorite = state.isSelectedFavorite,
             hasPrevious = state.selectedIndex > 0,
-            hasNext = state.selectedIndex < state.itemList.lastIndex,
+            hasNext = state.selectedIndex < state.displayedList.lastIndex,
             onPrevious = { onAction(DashboardAction.PreviousPokemon) },
             onNext = { onAction(DashboardAction.NextPokemon) },
             onToggleFavorite = { onAction(DashboardAction.ToggleFavorite) },
@@ -205,6 +233,45 @@ fun DashboardScreenContent(
             modifier = Modifier.fillMaxWidth()
         )
     }
+}
+
+@Composable
+fun PokemonSearchField(
+    query: String,
+    isSearching: Boolean,
+    onQueryChange: (String) -> Unit,
+    onClear: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    OutlinedTextField(
+        value = query,
+        onValueChange = onQueryChange,
+        modifier = modifier,
+        singleLine = true,
+        placeholder = { Text(text = "Buscar pokémon") },
+        leadingIcon = {
+            Icon(imageVector = Icons.Default.Search, contentDescription = null)
+        },
+        trailingIcon = {
+            when {
+                isSearching -> CircularProgressIndicator(
+                    modifier = Modifier.size(20.dp),
+                    strokeWidth = 2.dp
+                )
+
+                query.isNotEmpty() -> IconButton(onClick = onClear) {
+                    Icon(imageVector = Icons.Default.Close, contentDescription = "Limpiar búsqueda")
+                }
+            }
+        },
+        shape = RoundedCornerShape(50),
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.75f),
+            unfocusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.55f),
+            focusedBorderColor = MaterialTheme.colorScheme.primary,
+            unfocusedBorderColor = Color.Black
+        )
+    )
 }
 
 @Composable
