@@ -7,7 +7,7 @@ import com.carlos.pokedex.core.network.ApiClient
 import com.carlos.pokedex.core.network.PokedexService
 import com.carlos.pokedex.dashboard.data.repository.PokemonRepositoryImpl
 import com.carlos.pokedex.dashboard.domain.repository.IPokemonRepository
-import com.carlos.pokedex.dashboard.domain.usecase.GetAllPokemonUseCase
+import com.carlos.pokedex.dashboard.domain.usecase.GetPagedPokemonUseCase
 import com.carlos.pokedex.dashboard.domain.usecase.GetPokemonByNameUseCase
 import com.carlos.pokedex.dashboard.domain.usecase.SearchPokemonUseCase
 import com.carlos.pokedex.dashboard.presentation.DashboardViewModel
@@ -31,9 +31,9 @@ val appModule = module {
     }
     single { get<AppDatabase>().pokemonDao() }
     single { get<AppDatabase>().favoritePokemonDao() }
-    single<IPokemonRepository> { PokemonRepositoryImpl(get(), get()) }
+    single<IPokemonRepository> { PokemonRepositoryImpl(get(), get(), get()) }
     single<IFavoritePokemonRepository> { FavoritePokemonRepositoryImpl(get()) }
-    single { GetAllPokemonUseCase(get()) }
+    single { GetPagedPokemonUseCase(get()) }
     single { GetPokemonByNameUseCase(get()) }
     single { SearchPokemonUseCase(get()) }
     single { ObserveFavoritesUseCase(get()) }

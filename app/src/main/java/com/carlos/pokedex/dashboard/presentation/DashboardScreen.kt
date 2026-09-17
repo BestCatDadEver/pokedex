@@ -1,13 +1,13 @@
 package com.carlos.pokedex.dashboard.presentation
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
@@ -32,10 +32,11 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -51,12 +52,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -65,6 +64,10 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.paging.LoadState
+import androidx.paging.compose.LazyPagingItems
+import androidx.paging.compose.collectAsLazyPagingItems
+import androidx.paging.compose.itemKey
 import coil.compose.AsyncImage
 import com.carlos.pokedex.R
 import com.carlos.pokedex.core.ui.formatHeightOrDash
@@ -78,21 +81,23 @@ fun DashboardScreen(
     viewModel: DashboardViewModel = koinViewModel()
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val pagingItems = viewModel.pokemonPages.collectAsLazyPagingItems()
 
     Scaffold(
         containerColor = Color.Transparent,
         contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { paddingValues ->
         Box(modifier = Modifier.padding(paddingValues)) {
+            val refreshState = pagingItems.loadState.refresh
             when {
-                state.isLoading -> {
+                refreshState is LoadState.Loading && pagingItems.itemCount == 0 -> {
                     CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
                 }
 
-                state.error != null -> {
-                    Text(
-                        text = state.error ?: "",
-                        color = Color.Red,
+                refreshState is LoadState.Error && pagingItems.itemCount == 0 -> {
+                    LoadErrorMessage(
+                        message = refreshState.error.message ?: "No se pudo cargar la pokédex",
+                        onRetry = pagingItems::retry,
                         modifier = Modifier.align(Alignment.Center)
                     )
                 }
@@ -100,6 +105,7 @@ fun DashboardScreen(
                 else -> {
                     DashboardScreenContent(
                         state = state,
+                        pagingItems = pagingItems,
                         onAction = viewModel::onAction,
                         onPokemonClick = onPokemonClick
                     )
@@ -112,26 +118,33 @@ fun DashboardScreen(
 @Composable
 fun DashboardScreenContent(
     state: DashboardState,
+    pagingItems: LazyPagingItems<Pokemon>,
     onAction: (DashboardAction) -> Unit,
     onPokemonClick: (String) -> Unit
 ) {
     val listState = rememberLazyListState()
 
-    LaunchedEffect(listState, state.displayedList.size) {
-        snapshotFlow { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index }
-            .collect { lastVisibleIndex ->
-                if (lastVisibleIndex != null && lastVisibleIndex >= state.displayedList.size - 5) {
-                    onAction(DashboardAction.LoadMore)
-                }
-
-            }
+    // La búsqueda y el listado paginado se leen distinto, así que el resto de la pantalla habla
+    // con ellos a través de estos dos accesos.
+    val itemCount = if (state.isSearchActive) state.searchResults.size else pagingItems.itemCount
+    val itemAt: (Int) -> Pokemon? = { index ->
+        if (state.isSearchActive) {
+            state.searchResults.getOrNull(index)
+        } else {
+            pagingItems.itemSnapshotList.getOrNull(index)
+        }
     }
 
-    
+    // Al abrir la pantalla (o al salir de una búsqueda) se preselecciona el primero disponible.
+    LaunchedEffect(state.isSearchActive, state.selectedPokemon, itemCount) {
+        if (!state.isSearchActive && state.selectedPokemon == null && itemCount > 0) {
+            itemAt(0)?.let { onAction(DashboardAction.ItemSelected(0, it)) }
+        }
+    }
 
-    LaunchedEffect(state.selectedIndex) {
+    LaunchedEffect(state.selectedIndex, itemCount) {
         val targetIndex = state.selectedIndex
-        if (targetIndex !in state.displayedList.indices) return@LaunchedEffect
+        if (targetIndex !in 0 until itemCount) return@LaunchedEffect
 
         val layoutInfo = listState.layoutInfo
         val visibleItem = layoutInfo.visibleItemsInfo.find { it.index == targetIndex }
@@ -195,26 +208,65 @@ fun DashboardScreenContent(
                     .padding(16.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                items(state.displayedList.size) { index ->
-                    val pokemon = state.displayedList[index]
-                    val isSelected = index == state.selectedIndex
-                    DashboardItem(
-                        item = pokemon,
-                        isSelected = isSelected
-                    ) {
-                        // Selecciona y abre el detalle, así al volver la tarjeta queda seleccionada.
-                        onAction(DashboardAction.ItemClicked(pokemon))
-                        onPokemonClick(pokemon.name)
-                    }
-                }
-
-                if (state.isLoadingMore) {
-                    item {
-                        Box(modifier = Modifier
-                            .fillMaxHeight()
-                            .padding(16.dp), contentAlignment = Alignment.Center) {
-                            CircularProgressIndicator()
+                if (state.isSearchActive) {
+                    items(
+                        count = state.searchResults.size,
+                        key = { state.searchResults[it].id }
+                    ) { index ->
+                        val pokemon = state.searchResults[index]
+                        DashboardItem(
+                            item = pokemon,
+                            isSelected = index == state.selectedIndex
+                        ) {
+                            onAction(DashboardAction.ItemSelected(index, pokemon))
+                            onPokemonClick(pokemon.name)
                         }
+                    }
+                } else {
+                    items(
+                        count = pagingItems.itemCount,
+                        key = pagingItems.itemKey { it.id }
+                    ) { index ->
+                        pagingItems[index]?.let { pokemon ->
+                            DashboardItem(
+                                item = pokemon,
+                                isSelected = index == state.selectedIndex
+                            ) {
+                                onAction(DashboardAction.ItemSelected(index, pokemon))
+                                onPokemonClick(pokemon.name)
+                            }
+                        }
+                    }
+
+                    // Paging expone el estado de la carga incremental, así que ya no hace falta
+                    // rastrear el scroll a mano para saber cuándo pedir la página siguiente.
+                    when (val appendState = pagingItems.loadState.append) {
+                        is LoadState.Loading -> item {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxHeight()
+                                    .padding(16.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                CircularProgressIndicator()
+                            }
+                        }
+
+                        is LoadState.Error -> item {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxHeight()
+                                    .padding(16.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                LoadErrorMessage(
+                                    message = appendState.error.message ?: "Error al cargar",
+                                    onRetry = pagingItems::retry
+                                )
+                            }
+                        }
+
+                        else -> Unit
                     }
                 }
             }
@@ -225,13 +277,37 @@ fun DashboardScreenContent(
             selectedIndex = state.selectedIndex,
             isFavorite = state.isSelectedFavorite,
             hasPrevious = state.selectedIndex > 0,
-            hasNext = state.selectedIndex < state.displayedList.lastIndex,
-            onPrevious = { onAction(DashboardAction.PreviousPokemon) },
-            onNext = { onAction(DashboardAction.NextPokemon) },
+            hasNext = state.selectedIndex < itemCount - 1,
+            onPrevious = {
+                val index = state.selectedIndex - 1
+                itemAt(index)?.let { onAction(DashboardAction.ItemSelected(index, it)) }
+            },
+            onNext = {
+                val index = state.selectedIndex + 1
+                itemAt(index)?.let { onAction(DashboardAction.ItemSelected(index, it)) }
+            },
             onToggleFavorite = { onAction(DashboardAction.ToggleFavorite) },
             onDetails = onPokemonClick,
             modifier = Modifier.fillMaxWidth()
         )
+    }
+}
+
+@Composable
+fun LoadErrorMessage(
+    message: String,
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier.padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text(text = message, color = Color.Red, textAlign = TextAlign.Center)
+        Button(onClick = onRetry) {
+            Text(text = "Reintentar")
+        }
     }
 }
 
@@ -307,7 +383,7 @@ fun DashboardItem(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             AsyncImage(
-                model = item.details?.imageUrl,
+                model = item.spriteUrl,
                 contentDescription = item.name,
                 modifier = Modifier.size(80.dp)
             )
@@ -382,7 +458,7 @@ fun SelectedPokemonSection(
                     } else {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             AsyncImage(
-                                model = targetPokemon.details?.imageUrl,
+                                model = targetPokemon.spriteUrl,
                                 contentDescription = targetPokemon.name,
                                 modifier = Modifier.size(220.dp)
                             )
@@ -426,5 +502,3 @@ fun SelectedPokemonSection(
         }
     }
 }
-
-

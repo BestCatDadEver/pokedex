@@ -42,3 +42,11 @@ fun PokemonDetailsEntity.toDomain(): PokemonDetails = PokemonDetails(
     shinyImageUrl = shinyImageUrl,
     backShinyImageUrl = backShinyImageUrl
 )
+
+fun PokemonIndexEntity.toDomain(): Pokemon = Pokemon(id = id, name = name)
+
+fun Pokemon.toIndexEntity(orderIndex: Int): PokemonIndexEntity = PokemonIndexEntity(
+    id = id,
+    name = name,
+    orderIndex = orderIndex
+)

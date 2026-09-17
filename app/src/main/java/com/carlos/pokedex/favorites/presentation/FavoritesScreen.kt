@@ -130,7 +130,7 @@ fun FavoriteItem(
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 AsyncImage(
-                    model = pokemon.details?.imageUrl,
+                    model = pokemon.spriteUrl,
                     contentDescription = pokemon.name,
                     modifier = Modifier.size(56.dp)
                 )
